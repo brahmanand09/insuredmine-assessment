@@ -1,13 +1,12 @@
 {
-  "name": "insuredmine-assessment",
+  "name": "insurance-policy-api",
   "version": "1.0.0",
-  "description": "InsuredMine Technical Assessment - Policy Data Ingestion, Search, Aggregation, CPU Monitor & Scheduled Post",
-  "main": "server.js",
-  "type": "commonjs",
+  "description": "Node.js Insurance Policy Management API Assessment Solution",
+  "main": "src/server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
-    "test": "node test_api.js"
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node tests/api.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

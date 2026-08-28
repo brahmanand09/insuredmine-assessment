@@ -22,15 +22,10 @@ function switchTab(tabId) {
 
 async function fetchOverviewStats() {
   try {
-    const res = await fetch('/api/policies/overview');
+    const res = await fetch('/api/health');
     const data = await res.json();
-    if (data.success) {
-      document.getElementById('cnt-agents').innerText = data.collections.agents;
-      document.getElementById('cnt-users').innerText = data.collections.users;
-      document.getElementById('cnt-accounts').innerText = data.collections.accounts;
-      document.getElementById('cnt-categories').innerText = data.collections.categories;
-      document.getElementById('cnt-carriers').innerText = data.collections.carriers;
-      document.getElementById('cnt-policies').innerText = data.collections.policies;
+    if (data.status === 'OK') {
+      document.getElementById('cpu-pid').innerText = `Server PID: ${data.cpu.pid}`;
     }
   } catch (e) {
     console.error('Failed to fetch stats', e);
@@ -55,25 +50,25 @@ async function uploadSelectedFile() {
 
   const logBox = document.getElementById('upload-log');
   logBox.style.display = 'block';
-  logBox.innerText = `[Worker Thread] Uploading ${selectedFile.name} to server... Processing in background worker thread...`;
+  logBox.innerText = `[Worker Thread] Uploading ${selectedFile.name} to /api/import... Processing in background worker thread via bulkWrite()...`;
 
   try {
-    const res = await fetch('/api/policies/upload', {
+    const res = await fetch('/api/import', {
       method: 'POST',
       body: formData
     });
     const result = await res.json();
 
     if (result.success) {
-      logBox.innerText = `[Worker Thread Success] Data successfully ingested in ${result.data.durationMs}ms!\n` +
-        `Total Rows: ${result.data.totalRows}\n` +
-        `Inserted Policies: ${result.data.insertedPolicies}\n` +
-        `Agents Created: ${result.data.agentsCount}\n` +
-        `Users Created: ${result.data.usersCount}\n` +
-        `Accounts Created: ${result.data.accountsCount}\n` +
-        `Categories (LOB) Created: ${result.data.categoriesCount}\n` +
-        `Carriers Created: ${result.data.carriersCount}`;
-      fetchOverviewStats();
+      logBox.innerText = `[Worker Thread Success] Bulk Data Ingestion completed in ${result.data.durationMs}ms!\n` +
+        `Total Rows Read: ${result.data.totalRows}\n` +
+        `Processed Rows: ${result.data.processedRows}\n` +
+        `Skipped Invalid Rows: ${result.data.skippedRows}\n` +
+        `Agents Created/Updated: ${result.data.agentsCount}\n` +
+        `Users Created/Updated: ${result.data.usersCount}\n` +
+        `Accounts Created/Updated: ${result.data.accountsCount}\n` +
+        `LOBs Created/Updated: ${result.data.lobsCount}\n` +
+        `Carriers Created/Updated: ${result.data.carriersCount}`;
     } else {
       logBox.innerText = `[Error] ${result.message || result.error}`;
     }
@@ -96,41 +91,41 @@ async function searchPolicies() {
     const res = await fetch(`/api/policies/search?username=${encodeURIComponent(query)}`);
     const result = await res.json();
 
-    if (!result.success) {
-      container.innerHTML = `<p style="color: #ff416c;">${result.message}</p>`;
+    if (!result.success || !result.data) {
+      container.innerHTML = `<p style="color: #ff416c;">${result.message || 'No user found'}</p>`;
       return;
     }
 
+    const { user, policies } = result.data;
+
     let html = `<div style="margin-bottom: 20px;">
-      <span class="badge badge-cyan">Users Found: ${result.usersFound}</span>
-      <span class="badge badge-purple">Total Policies: ${result.totalPolicies}</span>
+      <span class="badge badge-cyan">User: ${user.name} (${user.email})</span>
+      <span class="badge badge-purple">Policies Found: ${policies.length}</span>
     </div>`;
 
     html += `<table>
       <thead>
         <tr>
           <th>Policy #</th>
-          <th>User</th>
-          <th>Account</th>
           <th>Category (LOB)</th>
           <th>Carrier</th>
           <th>Agent</th>
+          <th>Account</th>
           <th>Premium</th>
           <th>Start Date</th>
         </tr>
       </thead>
       <tbody>`;
 
-    result.data.policies.forEach(p => {
+    policies.forEach(p => {
       html += `<tr>
-        <td><strong>${p.policy_number}</strong></td>
-        <td>${p.user_id ? p.user_id.firstname : 'N/A'}</td>
-        <td>${p.account_id ? p.account_id.account_name : 'N/A'}</td>
-        <td><span class="badge badge-cyan">${p.category_id ? p.category_id.category_name : 'N/A'}</span></td>
-        <td><span class="badge badge-purple">${p.company_id ? p.company_id.company_name : 'N/A'}</span></td>
-        <td>${p.agent_id ? p.agent_id.name : 'N/A'}</td>
-        <td>$${p.premium_amount ? p.premium_amount.toFixed(2) : '0.00'}</td>
-        <td>${p.policy_start_date ? new Date(p.policy_start_date).toLocaleDateString() : 'N/A'}</td>
+        <td><strong>${p.policyNumber}</strong></td>
+        <td><span class="badge badge-cyan">${p.category}</span></td>
+        <td><span class="badge badge-purple">${p.carrier}</span></td>
+        <td>${p.agent}</td>
+        <td>${p.account}</td>
+        <td>$${p.premiumAmount ? p.premiumAmount.toFixed(2) : '0.00'}</td>
+        <td>${p.startDate || 'N/A'}</td>
       </tr>`;
     });
 
@@ -143,14 +138,14 @@ async function searchPolicies() {
 
 async function loadAggregatedPolicies() {
   const container = document.getElementById('aggregated-results-container');
-  container.innerHTML = `<p style="color: var(--text-muted);">Loading MongoDB aggregation pipeline...</p>`;
+  container.innerHTML = `<p style="color: var(--text-muted);">Loading MongoDB aggregation pipeline from /api/policies/aggregate/users...</p>`;
 
   try {
-    const res = await fetch('/api/policies/aggregated');
+    const res = await fetch('/api/policies/aggregate/users');
     const result = await res.json();
 
-    if (!result.success || result.data.length === 0) {
-      container.innerHTML = `<p style="color: var(--text-muted);">No aggregated policy records found. Upload sample data first!</p>`;
+    if (!result.success || !result.data || result.data.length === 0) {
+      container.innerHTML = `<p style="color: var(--text-muted);">No aggregated policy records found. Import sample data first!</p>`;
       return;
     }
 
@@ -159,11 +154,8 @@ async function loadAggregatedPolicies() {
         <tr>
           <th>User Name</th>
           <th>Email</th>
-          <th>User Type</th>
           <th>Total Policies</th>
           <th>Total Premium</th>
-          <th>Category Count</th>
-          <th>Carrier Count</th>
         </tr>
       </thead>
       <tbody>`;
@@ -172,11 +164,8 @@ async function loadAggregatedPolicies() {
       html += `<tr>
         <td><strong>${item.userName}</strong></td>
         <td>${item.email || 'N/A'}</td>
-        <td><span class="badge badge-green">${item.userType || 'Client'}</span></td>
-        <td><span class="badge badge-cyan">${item.totalPolicies} policies</span></td>
-        <td><strong>$${item.totalPremiumAmount.toFixed(2)}</strong></td>
-        <td>${item.categoryCount} LOBs</td>
-        <td>${item.carrierCount} Carriers</td>
+        <td><span class="badge badge-cyan">${item.policyCount} policies</span></td>
+        <td><strong>$${item.totalPremium ? item.totalPremium.toFixed(2) : '0.00'}</strong></td>
       </tr>`;
     });
 
@@ -187,7 +176,6 @@ async function loadAggregatedPolicies() {
   }
 }
 
-// CPU Monitoring
 function startCpuPolling() {
   setInterval(async () => {
     try {
@@ -211,7 +199,6 @@ function startCpuPolling() {
         }
       }
     } catch (e) {
-      // Server might be restarting
       document.getElementById('cpu-status-text').innerText = 'Status: Server Restarting...';
       document.getElementById('cpu-status-text').style.color = '#ff416c';
     }
@@ -226,15 +213,14 @@ async function triggerCpuSpike() {
     await fetch('/api/system/simulate-cpu-spike', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ durationMs: 6000 })
+      body: JSON.stringify({ durationMs: 5000 })
     });
-    alert('CPU Spike simulation launched! Watch the CPU gauge and server log for auto-restart.');
+    alert('CPU Spike simulation launched! Watch CPU gauge for restart.');
   } catch (err) {
     alert('Triggered spike signal!');
   }
 }
 
-// Task 2 (2) Scheduled Message
 async function handleScheduleSubmit(e) {
   e.preventDefault();
   const message = document.getElementById('msg-input').value.trim();
@@ -249,7 +235,7 @@ async function handleScheduleSubmit(e) {
     });
     const data = await res.json();
     if (data.success) {
-      alert(`Message successfully scheduled for ${new Date(data.data.scheduledFor).toLocaleString()}!`);
+      alert(`Message successfully scheduled for ${new Date(data.data.scheduledAt).toLocaleString()}!`);
       document.getElementById('schedule-form').reset();
       loadScheduledMessages();
     } else {
@@ -266,7 +252,7 @@ async function loadScheduledMessages() {
     const res = await fetch('/api/messages');
     const result = await res.json();
 
-    if (!result.success || result.data.length === 0) {
+    if (!result.success || !result.data || result.data.length === 0) {
       container.innerHTML = `<p style="color: var(--text-muted);">No scheduled messages in database.</p>`;
       return;
     }
@@ -278,19 +264,19 @@ async function loadScheduledMessages() {
           <th>Day / Time Input</th>
           <th>Scheduled Target Time</th>
           <th>Status</th>
-          <th>Inserted At</th>
+          <th>Completed At</th>
         </tr>
       </thead>
       <tbody>`;
 
     result.data.forEach(m => {
-      const badgeClass = m.status === 'inserted' ? 'badge-green' : (m.status === 'scheduled' ? 'badge-cyan' : 'badge-purple');
+      const badgeClass = m.status === 'completed' ? 'badge-green' : (m.status === 'pending' ? 'badge-cyan' : 'badge-purple');
       html += `<tr>
         <td><strong>${m.message}</strong></td>
         <td>${m.day} at ${m.time}</td>
-        <td>${new Date(m.scheduledFor).toLocaleString()}</td>
+        <td>${new Date(m.scheduledAt).toLocaleString()}</td>
         <td><span class="badge ${badgeClass}">${m.status.toUpperCase()}</span></td>
-        <td>${m.insertedAt ? new Date(m.insertedAt).toLocaleString() : 'Pending'}</td>
+        <td>${m.completedAt ? new Date(m.completedAt).toLocaleString() : 'Pending'}</td>
       </tr>`;
     });
 
