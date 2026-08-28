@@ -1,160 +1,165 @@
-# InsuredMine Technical Assessment Solution (Node.js & MongoDB)
+# Insurance Policy Management API (Node.js & MongoDB)
 
-A robust, production-ready Node.js backend application built with Express and MongoDB to handle high-performance policy data ingestion, user policy search and aggregations, real-time server CPU utilization monitoring with automatic restart, and a scheduled message posting service.
-
----
-
-## 🚀 Features & Completed Tasks
-
-### Task 1: Policy Data Management & Ingestion
-1. **Worker Threads Data Ingestion API (`POST /api/policies/upload`)**:
-   - Parses attached `.xlsx` / `.csv` data asynchronously using Node.js `worker_threads`.
-   - Avoids main event-loop blocking during large file processing.
-2. **Policy Search API (`GET /api/policies/search?username=...`)**:
-   - Finds policy info by searching username / firstname.
-   - Returns user details along with populated collection references.
-3. **Aggregated Policy by User API (`GET /api/policies/aggregated`)**:
-   - Uses MongoDB Aggregation Framework to group policies per user, computing total policy count, total premium written, category count, and carrier breakdown.
-4. **6 Separate MongoDB Collections Architecture**:
-   - **Agent**: Agent Name
-   - **User**: firstname, DOB, address, phone, state, zip, email, gender, userType
-   - **UserAccount**: account_name, userId
-   - **PolicyCategory (LOB)**: category_name
-   - **PolicyCarrier**: company_name
-   - **Policy**: policy_number, policy_start_date, policy_end_date, category_id, company_id, user_id, account_id, agent_id, premium_amount
-
-### Task 2: Server Monitor & Scheduled Post Service
-1. **Real-time Server CPU Monitoring & Auto-Restart (`GET /api/system/cpu`)**:
-   - Continuously tracks CPU utilization % of the Node.js server.
-   - Automatically logs an alert and triggers a server restart when CPU usage hits or exceeds **70%**.
-   - Includes a simulation API (`POST /api/system/simulate-cpu-spike`) for easy testing.
-2. **Scheduled Message Post Service (`POST /api/messages/schedule`)**:
-   - Accepts `message`, `day`, and `time` parameters in the body.
-   - Schedules DB insertion of the message into MongoDB at that exact specified day & time using `node-schedule`.
-   - Automatically restores pending scheduled jobs across server restarts.
+A high-performance, enterprise-grade Node.js backend application built with Express and MongoDB for importing XLSX/CSV data via Worker Threads, managing normalized policy collections, searching policy data, aggregating user policies, tracking real-time CPU utilization with auto-restart, and scheduling persistent messages.
 
 ---
 
-## 🛠️ Technology Stack
-- **Language**: JavaScript (Node.js v24+)
-- **Framework**: Express.js
-- **Database**: MongoDB & Mongoose
-- **Concurrency**: Node.js `worker_threads`
-- **Scheduler**: `node-schedule`
-- **CPU Tracking**: `pidusage`
-- **File Parsing**: `xlsx`, `multer`
+## 🚀 Features & Architectural Overview
+
+- **Worker Threads Data Import (`POST /api/import`)**:
+  - Asynchronously parses `.xlsx` and `.csv` files off the main event loop using Node.js `worker_threads`.
+  - Uses MongoDB `bulkWrite()` with `upsert: true` for high-speed bulk ingestion and entity deduplication.
+  - Implements row-level validation to skip malformed data gracefully without breaking ingestion.
+
+- **Policy Search API (`GET /api/policies/search?username=...`)**:
+  - Searches policy information by username / firstname.
+  - Returns user details along with populated collection references (`Lob`, `Carrier`, `Agent`, `Account`).
+
+- **User Policy Aggregation API (`GET /api/policies/aggregate/users`)**:
+  - Leverages MongoDB Aggregation Framework (`$group`, `$lookup`, `$project`, `$sort`) to provide policy metrics per user.
+
+- **MongoDB Normalized Collection Schemas**:
+  - `agents`: Unique `name` index.
+  - `users`: Unique `email` index.
+  - `accounts`: Unique compound `(name, userId)` index.
+  - `lobs`: Unique `name` index (Policy Categories).
+  - `carriers`: Unique `name` index (Policy Carriers).
+  - `policies`: Unique `policyNumber` index referencing User, Agent, Account, LOB, and Carrier.
+  - `scheduled_messages`: Persistent task log.
+
+- **Real-Time CPU Monitoring & PM2 Auto-Restart**:
+  - Continuously monitors server CPU utilization via `pidusage`.
+  - Configurable via `CPU_THRESHOLD=70` and `CPU_CHECK_INTERVAL=5000`.
+  - Triggers graceful shutdown (`process.exit(1)`) so PM2 (or standalone fallback) automatically restarts the process upon sustained >70% CPU usage.
+
+- **Persistent Message Scheduler (`POST /api/messages/schedule`)**:
+  - Accepts `message`, `day`, and `time` parameters in the body.
+  - Persists scheduled jobs in MongoDB (`scheduled_messages`) and restores pending tasks automatically on server restarts.
 
 ---
 
-## 📥 Setup & Installation Instructions
+## 📂 Project Directory Structure
+
+```
+insurance-policy-api/
+├── src/
+│   ├── app.js                    # Express app configuration & middleware
+│   ├── server.js                 # Server entry point & DB initialization
+│   ├── config/
+│   │   └── db.js                 # Mongoose database connection
+│   ├── models/
+│   │   ├── Agent.js              # agents collection schema
+│   │   ├── User.js               # users collection schema
+│   │   ├── Account.js            # accounts collection schema
+│   │   ├── Lob.js                # lobs collection schema
+│   │   ├── Carrier.js            # carriers collection schema
+│   │   ├── Policy.js             # policies collection schema
+│   │   └── ScheduledMessage.js   # scheduled_messages collection schema
+│   ├── controllers/
+│   │   ├── importController.js   # Handles file upload & worker ingestion
+│   │   ├── policyController.js   # Search, Aggregation & Health APIs
+│   │   └── messageController.js  # Scheduled post API
+│   ├── routes/
+│   │   ├── importRoutes.js       # Import Express routes
+│   │   ├── policyRoutes.js       # Policy Express routes
+│   │   └── messageRoutes.js      # Scheduler Express routes
+│   ├── services/
+│   │   ├── importService.js      # Ingestion service & worker bridge
+│   │   ├── policyService.js      # Policy query & aggregation logic
+│   │   ├── schedulerService.js   # Message scheduling & DB restoration
+│   │   └── cpuMonitorService.js  # CPU tracking & restart logic
+│   ├── workers/
+│   │   └── excelWorker.js        # Worker thread with bulkWrite() upserts
+│   ├── middleware/
+│   │   ├── upload.js             # Multer upload middleware
+│   │   └── errorHandler.js       # Centralized Express error handler
+│   └── utils/
+│       ├── cpuUsage.js           # CPU utilization helper
+│       └── logger.js             # Logging utility
+├── public/                       # Glassmorphic Admin Web Dashboard
+├── tests/
+│   └── api.test.js               # Automated end-to-end test suite
+├── ecosystem.config.js           # PM2 configuration file
+├── .env                          # Local environment config
+├── .env.example                  # Environment configuration template
+├── .gitignore
+├── package.json
+└── README.md
+```
+
+---
+
+## ⚙️ Installation & Setup Guide
 
 ### 1. Prerequisites
-- [Node.js](https://nodejs.org/) (v18+)
-- [MongoDB](https://www.mongodb.com/) (running locally at `mongodb://localhost:27017` or MongoDB Atlas URI)
+- **Node.js** (v18+)
+- **MongoDB** (running locally at `mongodb://localhost:27017` or MongoDB Atlas URI)
 
-### 2. Installation
+### 2. Install Dependencies
 ```bash
-# Clone the repository
-git clone <YOUR_GITHUB_REPO_URL>
-cd InsuredMine
-
-# Install dependencies
+git clone https://github.com/brahmanand09/insuredmine-assessment.git
+cd insuredmine-assessment
 npm install
 ```
 
-### 3. Environment Configuration
-Create a `.env` file in the root directory (already included):
+### 3. Environment Variables
+Create a `.env` file from `.env.example`:
 ```env
-PORT=3000
-MONGODB_URI=mongodb://localhost:27017/insuredmine_db
+PORT=5000
+MONGODB_URI=mongodb://localhost:27017/insurance_policy_db
+CPU_THRESHOLD=70
+CPU_CHECK_INTERVAL=5000
 ```
 
-### 4. Run the Server
+### 4. Running the Application
+
+#### Standard Mode:
 ```bash
-# Start server
 npm start
 ```
-The server will run at: `http://localhost:3000`
-Web Dashboard will be accessible at: `http://localhost:3000`
+Server runs on: `http://localhost:5000`
+
+#### PM2 Mode (Production Recommended):
+```bash
+# Install PM2 globally if not installed
+npm install -g pm2
+
+# Start process via PM2
+pm2 start ecosystem.config.js
+
+# Monitor PM2 logs
+pm2 logs insurance-api
+```
 
 ---
 
 ## 🧪 Running Automated Tests
 
-An automated test script is provided to verify all APIs and database collections end-to-end:
-
+Run the comprehensive end-to-end test suite:
 ```bash
-# Run server in one terminal:
-npm start
-
-# Run end-to-end test in another terminal:
 npm test
 ```
 
 ---
 
-## 📑 API Reference Documentation
+## 📑 API Endpoint Documentation
 
-### Task 1 APIs
-
-#### 1. Ingest Data File (Worker Threads)
-- **Endpoint**: `POST /api/policies/upload`
-- **Body**: `multipart/form-data` with field `file` (Upload `.xlsx` or `.csv`).
-
-#### 2. Search Policy by Username
-- **Endpoint**: `GET /api/policies/search?username=Lura Lucca`
-- **Response**: User object and list of policies populated with Category, Carrier, Agent, and Account references.
-
-#### 3. Get Aggregated Policies by User
-- **Endpoint**: `GET /api/policies/aggregated`
-- **Response**: Array of users with `totalPolicies`, `totalPremiumAmount`, policy numbers list, and LOB counts.
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/import` | Upload `.xlsx`/`.csv` file for Worker Thread `bulkWrite()` ingestion |
+| `GET` | `/api/policies/search?username=Lura` | Search policy info by username |
+| `GET` | `/api/policies/aggregate/users` | Aggregate policies by user |
+| `POST` | `/api/messages/schedule` | Schedule a message for DB insertion |
+| `GET` | `/api/health` | Check server health, uptime & CPU metrics |
 
 ---
 
-### Task 2 APIs
+## 🖥️ Web Admin Dashboard
 
-#### 1. Real-time Server CPU Metrics
-- **Endpoint**: `GET /api/system/cpu`
-- **Response**: `{ currentCpuPercentage, thresholdPercentage: 70, status: "NORMAL" | "EXCEEDED_THRESHOLD" }`
-
-#### 2. Simulate CPU Spike (>70% Auto-Restart Test)
-- **Endpoint**: `POST /api/system/simulate-cpu-spike`
-- **Body**: `{ "durationMs": 6000 }`
-
-#### 3. Schedule Message Post
-- **Endpoint**: `POST /api/messages/schedule`
-- **Body**:
-```json
-{
-  "message": "Policy Renewal Reminder",
-  "day": "tomorrow",
-  "time": "14:30"
-}
-```
+Open `http://localhost:5000` in your web browser to visually test file imports, search policies, view user aggregations, inspect real-time CPU gauge, and schedule messages!
 
 ---
 
-## 💻 Interactive Admin Web Dashboard
+## 📤 Postman API Collection
 
-Open `http://localhost:3000` in your web browser to test all features visually via a modern glassmorphic interface!
-
----
-
-## 📤 Instructions for Uploading to GitHub & Sharing Access
-
-1. Create a new repository on GitHub (e.g. `insuredmine-technical-assessment`).
-2. Initialize git and commit files:
-   ```bash
-   git init
-   git add .
-   git commit -m "Complete InsuredMine technical assessment submission"
-   ```
-3. Push to your GitHub repository:
-   ```bash
-   git branch -M main
-   git remote add origin https://github.com/<your-username>/insuredmine-technical-assessment.git
-   git push -u origin main
-   ```
-4. Share access:
-   - Go to your GitHub repository -> **Settings** -> **Collaborators**.
-   - Click **Add people** and enter the InsuredMine reviewer GitHub usernames or emails provided.
+Import [`InsuredMine_API_Collection.json`](file:///d:/Old%20System/Projects/InsuredMine/InsuredMine_API_Collection.json) into Postman to instantly test all endpoints.
