@@ -12,14 +12,31 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
+    // Generate safe filename
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
-    cb(null, `${uniqueSuffix}-${file.originalname}`);
+    const safeExt = path.extname(file.originalname).toLowerCase();
+    cb(null, `import-${uniqueSuffix}${safeExt}`);
   }
 });
 
+const allowedMimes = [
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+  'text/csv',
+  'application/csv',
+  'text/x-csv',
+  'application/x-csv',
+  'text/comma-separated-values',
+  'text/anytext',
+  'application/octet-stream' // Browsers often send octet-stream for csv/xlsx
+];
+
 const fileFilter = (req, file, cb) => {
   const ext = path.extname(file.originalname).toLowerCase();
-  if (ext === '.xlsx' || ext === '.xls' || ext === '.csv') {
+  const isAllowedExt = ext === '.xlsx' || ext === '.xls' || ext === '.csv';
+  const isAllowedMime = allowedMimes.includes(file.mimetype);
+
+  if (isAllowedExt && isAllowedMime) {
     cb(null, true);
   } else {
     const err = new Error('Invalid file format. Only XLSX and CSV files are supported.');
@@ -31,7 +48,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 50 * 1024 * 1024 } // 50MB max
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
 
 module.exports = upload;

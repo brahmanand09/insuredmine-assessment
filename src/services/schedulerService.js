@@ -1,5 +1,6 @@
 const schedule = require('node-schedule');
 const ScheduledMessage = require('../models/ScheduledMessage');
+const Message = require('../models/Message');
 const logger = require('../utils/logger');
 
 function calculateTargetDate(dayStr, timeStr) {
@@ -51,7 +52,7 @@ exports.scheduleMessage = async ({ message, day, time }) => {
   const scheduledAt = calculateTargetDate(day, time);
   const now = new Date();
 
-  // Persist job in MongoDB
+  // Persist scheduled job in MongoDB
   const doc = await ScheduledMessage.create({
     message,
     day,
@@ -72,19 +73,40 @@ exports.scheduleMessage = async ({ message, day, time }) => {
   return doc;
 };
 
+/**
+ * Atomically claim and execute scheduled job to prevent race conditions across multiple instances
+ */
 async function executeJob(jobId) {
   try {
-    const doc = await ScheduledMessage.findById(jobId);
-    if (!doc || doc.status === 'completed') return;
+    // 1. Atomic Claim: status 'pending' -> 'processing'
+    const job = await ScheduledMessage.findOneAndUpdate(
+      { _id: jobId, status: 'pending' },
+      { $set: { status: 'processing', processingAt: new Date() } },
+      { new: true }
+    );
 
-    doc.status = 'completed';
-    doc.completedAt = new Date();
-    await doc.save();
+    if (!job) {
+      // Job already claimed or completed by another instance
+      return;
+    }
 
-    logger.info(`[SCHEDULED JOB EXECUTED] Message inserted: "${doc.message}" (ID: ${doc._id})`);
+    // 2. Insert Message record into DB
+    await Message.create({
+      message: job.message,
+      scheduledJobId: job._id,
+      insertedAt: new Date()
+    });
+
+    // 3. Mark job as completed
+    await ScheduledMessage.updateOne(
+      { _id: job._id },
+      { $set: { status: 'completed', completedAt: new Date() } }
+    );
+
+    logger.info(`[ATOMIC SCHEDULED JOB EXECUTED] Message inserted into DB: "${job.message}" (ID: ${job._id})`);
   } catch (error) {
     logger.error(`[SCHEDULED JOB FAILED] ID: ${jobId}`, error);
-    await ScheduledMessage.findByIdAndUpdate(jobId, { status: 'failed' });
+    await ScheduledMessage.updateOne({ _id: jobId }, { $set: { status: 'failed' } });
   }
 }
 

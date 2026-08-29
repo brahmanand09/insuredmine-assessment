@@ -35,29 +35,28 @@ async function processFile() {
 
     console.log(`[Worker Thread] Loaded ${rawRows.length} raw rows from file.`);
 
-    const agentBulkOps = [];
-    const userBulkOps = [];
-    const accountBulkOps = [];
-    const lobBulkOps = [];
-    const carrierBulkOps = [];
-
     const validRows = [];
-    let skippedRowsCount = 0;
+    const skippedRows = [];
 
+    // 1. Strict Validation: Validate email and policy_number (No manufacturing fake data)
     for (let i = 0; i < rawRows.length; i++) {
       const row = rawRows[i];
+      const rowNum = i + 2; // Excel line number (row 1 is header)
 
-      // Row validation: check required fields
-      const firstname = (row.firstname || row.user || '').trim();
-      const policyNumber = (row.policy_number || '').trim();
-
-      if (!firstname && !policyNumber) {
-        skippedRowsCount++;
+      const email = String(row.email || '').trim().toLowerCase();
+      if (!email) {
+        skippedRows.push({ row: rowNum, reason: 'Email is required' });
         continue;
       }
 
+      const policyNumber = String(row.policy_number || '').trim();
+      if (!policyNumber) {
+        skippedRows.push({ row: rowNum, reason: 'Policy number is required' });
+        continue;
+      }
+
+      const firstname = (row.firstname || row.user || 'Unknown User').trim();
       const agentName = (row.agent || 'Unknown Agent').trim();
-      const email = (row.email || `${firstname.toLowerCase().replace(/\s+/g, '')}@placeholder.com`).trim().toLowerCase();
       const accountName = (row.account_name || `${firstname}'s Account`).trim();
       const categoryName = (row.category_name || 'General').trim();
       const companyName = (row.company_name || 'Default Carrier').trim();
@@ -70,53 +69,76 @@ async function processFile() {
         accountName,
         categoryName,
         companyName,
-        policyNumber: policyNumber || `POL-${Date.now()}-${i}`
-      });
-
-      // Prepare Bulk Upsert Operations
-      agentBulkOps.push({
-        updateOne: {
-          filter: { name: agentName },
-          update: { $setOnInsert: { name: agentName } },
-          upsert: true
-        }
-      });
-
-      userBulkOps.push({
-        updateOne: {
-          filter: { email },
-          update: {
-            $set: {
-              firstName: firstname,
-              dob: parseExcelDate(row.dob),
-              address: (row.address || '').trim(),
-              phone: String(row.phone || '').trim(),
-              state: (row.state || '').trim(),
-              zip: String(row.zip || '').trim(),
-              gender: row.gender ? String(row.gender).trim() : null,
-              userType: (row.userType || 'Active Client').trim()
-            }
-          },
-          upsert: true
-        }
-      });
-
-      lobBulkOps.push({
-        updateOne: {
-          filter: { name: categoryName },
-          update: { $setOnInsert: { name: categoryName } },
-          upsert: true
-        }
-      });
-
-      carrierBulkOps.push({
-        updateOne: {
-          filter: { name: companyName },
-          update: { $setOnInsert: { name: companyName } },
-          upsert: true
-        }
+        policyNumber
       });
     }
+
+    if (validRows.length === 0) {
+      parentPort.postMessage({
+        status: 'success',
+        totalRows: rawRows.length,
+        processedRows: 0,
+        skippedRows: skippedRows.length,
+        errors: skippedRows,
+        agentsCount: 0,
+        usersCount: 0,
+        accountsCount: 0,
+        lobsCount: 0,
+        carriersCount: 0,
+        durationMs: Date.now() - startTime
+      });
+      return;
+    }
+
+    // 2. Batch-Scoped Queries (Extract unique batch entities)
+    const uniqueAgentNames = [...new Set(validRows.map(r => r.agentName))];
+    const uniqueEmails = [...new Set(validRows.map(r => r.email))];
+    const uniqueLobNames = [...new Set(validRows.map(r => r.categoryName))];
+    const uniqueCarrierNames = [...new Set(validRows.map(r => r.companyName))];
+
+    // Prepare Bulk Upsert Operations for entities
+    const agentBulkOps = uniqueAgentNames.map(name => ({
+      updateOne: {
+        filter: { name },
+        update: { $setOnInsert: { name } },
+        upsert: true
+      }
+    }));
+
+    const userBulkOps = validRows.map(item => ({
+      updateOne: {
+        filter: { email: item.email },
+        update: {
+          $set: {
+            firstName: item.firstname,
+            dob: parseExcelDate(item.row.dob),
+            address: (item.row.address || '').trim(),
+            phone: String(item.row.phone || '').trim(),
+            state: (item.row.state || '').trim(),
+            zip: String(item.row.zip || '').trim(),
+            gender: item.row.gender ? String(item.row.gender).trim() : null,
+            userType: (item.row.userType || 'Active Client').trim()
+          }
+        },
+        upsert: true
+      }
+    }));
+
+    const lobBulkOps = uniqueLobNames.map(name => ({
+      updateOne: {
+        filter: { name },
+        update: { $setOnInsert: { name } },
+        upsert: true
+      }
+    }));
+
+    const carrierBulkOps = uniqueCarrierNames.map(name => ({
+      updateOne: {
+        filter: { name },
+        update: { $setOnInsert: { name } },
+        upsert: true
+      }
+    }));
 
     // Execute Bulk Write for references concurrently
     await Promise.all([
@@ -126,12 +148,12 @@ async function processFile() {
       carrierBulkOps.length ? Carrier.bulkWrite(carrierBulkOps, { ordered: false }) : Promise.resolve()
     ]);
 
-    // Fetch generated IDs into Maps
+    // Fetch batch-scoped document IDs into Maps
     const [agents, users, lobs, carriers] = await Promise.all([
-      Agent.find().lean(),
-      User.find().lean(),
-      Lob.find().lean(),
-      Carrier.find().lean()
+      Agent.find({ name: { $in: uniqueAgentNames } }).lean(),
+      User.find({ email: { $in: uniqueEmails } }).lean(),
+      Lob.find({ name: { $in: uniqueLobNames } }).lean(),
+      Carrier.find({ name: { $in: uniqueCarrierNames } }).lean()
     ]);
 
     const agentMap = new Map(agents.map(a => [a.name.toLowerCase(), a._id]));
@@ -140,6 +162,7 @@ async function processFile() {
     const carrierMap = new Map(carriers.map(c => [c.name.toLowerCase(), c._id]));
 
     // Account bulk write with userId reference
+    const accountBulkOps = [];
     for (const item of validRows) {
       const userId = userMap.get(item.email.toLowerCase());
       if (userId) {
@@ -163,7 +186,9 @@ async function processFile() {
       await Account.bulkWrite(accountBulkOps, { ordered: false });
     }
 
-    const accounts = await Account.find().lean();
+    const uniqueAccountNames = [...new Set(validRows.map(r => r.accountName))];
+    const userIds = [...userMap.values()];
+    const accounts = await Account.find({ name: { $in: uniqueAccountNames }, userId: { $in: userIds } }).lean();
     const accountMap = new Map(accounts.map(a => [`${a.name.toLowerCase()}_${a.userId}`, a._id]));
 
     // Prepare Policy Bulk Operations
@@ -207,7 +232,8 @@ async function processFile() {
       status: 'success',
       totalRows: rawRows.length,
       processedRows: validRows.length,
-      skippedRows: skippedRowsCount,
+      skippedRows: skippedRows.length,
+      errors: skippedRows,
       agentsCount: agentMap.size,
       usersCount: userMap.size,
       accountsCount: accountMap.size,

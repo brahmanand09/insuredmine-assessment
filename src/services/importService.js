@@ -1,5 +1,6 @@
 const { Worker } = require('worker_threads');
 const path = require('path');
+const fs = require('fs');
 const logger = require('../utils/logger');
 
 exports.importFileData = (filePath) => {
@@ -13,7 +14,19 @@ exports.importFileData = (filePath) => {
       workerData: { filePath, mongoUri }
     });
 
-    worker.on('message', (message) => {
+    const cleanupTempFile = async () => {
+      try {
+        if (fs.existsSync(filePath)) {
+          await fs.promises.unlink(filePath);
+          logger.info(`Cleaned up temporary upload file: ${filePath}`);
+        }
+      } catch (err) {
+        logger.warn(`Failed to cleanup temp file ${filePath}: ${err.message}`);
+      }
+    };
+
+    worker.on('message', async (message) => {
+      await cleanupTempFile();
       if (message.status === 'success') {
         resolve(message);
       } else {
@@ -21,7 +34,8 @@ exports.importFileData = (filePath) => {
       }
     });
 
-    worker.on('error', (err) => {
+    worker.on('error', async (err) => {
+      await cleanupTempFile();
       logger.error('Worker Thread Error:', err);
       reject(err);
     });
