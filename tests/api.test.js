@@ -194,6 +194,8 @@ async function runTestSuite() {
     process.exitCode = 1;
   } finally {
     if (server) server.close();
+    const schedule = require('node-schedule');
+    await schedule.gracefulShutdown();
     await mongoose.disconnect();
   }
 }
