@@ -38,7 +38,7 @@ async function processFile() {
     const validRows = [];
     const skippedRows = [];
 
-    // Strict Validation: Validate all 7 business-critical fields (No manufactured fake data)
+    // Strict Validation: Validate all 7 required business fields (No manufactured fake data)
     for (let i = 0; i < rawRows.length; i++) {
       const row = rawRows[i];
       const rowNum = i + 2; // Excel line number (row 1 is header)
@@ -63,7 +63,7 @@ async function processFile() {
 
       const agentName = String(row.agent || '').trim();
       if (!agentName) {
-        skippedRows.push({ row: rowNum, reason: 'Agent name is required' });
+        skippedRows.push({ row: rowNum, reason: 'Agent is required' });
         continue;
       }
 
@@ -75,13 +75,13 @@ async function processFile() {
 
       const categoryName = String(row.category_name || '').trim();
       if (!categoryName) {
-        skippedRows.push({ row: rowNum, reason: 'Category name (LOB) is required' });
+        skippedRows.push({ row: rowNum, reason: 'Policy category is required' });
         continue;
       }
 
       const companyName = String(row.company_name || '').trim();
       if (!companyName) {
-        skippedRows.push({ row: rowNum, reason: 'Company name (Carrier) is required' });
+        skippedRows.push({ row: rowNum, reason: 'Policy carrier is required' });
         continue;
       }
 

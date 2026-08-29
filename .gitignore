@@ -1,16 +1,10 @@
 # Dependencies
 node_modules/
 
-# Environment variables
+# Environment
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# File uploads directory
-uploads/
-!uploads/.gitkeep
+.env.*
+!.env.example
 
 # Logs
 logs/
@@ -19,15 +13,38 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# OS metadata
+# Runtime/temp
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+
+# Uploads
+uploads/
+!uploads/.gitkeep
+
+# Test coverage
+coverage/
+
+# Database backups
+dump/
+backup/
+*.bson
+*.archive
+
+# IDE
+.vscode/
+.idea/
+
+# OS
 .DS_Store
 Thumbs.db
 
-# IDE settings
-.vscode/
-.idea/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.swp
+# Secrets/private keys
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials/
