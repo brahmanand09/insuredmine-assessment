@@ -22,14 +22,31 @@ function switchTab(tabId) {
 
 async function fetchOverviewStats() {
   try {
-    const res = await fetch('/api/health');
-    const data = await res.json();
-    if (data.status === 'OK') {
-      document.getElementById('cpu-pid').innerText = `Server PID: ${data.cpu.pid}`;
+    const [healthRes, overviewRes] = await Promise.all([
+      fetch('/api/health').then(r => r.json()).catch(() => ({})),
+      fetch('/api/policies/overview').then(r => r.json()).catch(() => ({}))
+    ]);
+
+    if (healthRes && healthRes.status === 'OK' && healthRes.cpu) {
+      document.getElementById('cpu-pid').innerText = `Server PID: ${healthRes.cpu.pid}`;
+    }
+
+    if (overviewRes && overviewRes.success && overviewRes.data) {
+      updateStatCards(overviewRes.data);
     }
   } catch (e) {
     console.error('Failed to fetch stats', e);
   }
+}
+
+function updateStatCards(data) {
+  if (!data) return;
+  document.getElementById('cnt-agents').innerText = data.agentsCount !== undefined ? data.agentsCount : (data.agents || 0);
+  document.getElementById('cnt-users').innerText = data.usersCount !== undefined ? data.usersCount : (data.users || 0);
+  document.getElementById('cnt-accounts').innerText = data.accountsCount !== undefined ? data.accountsCount : (data.accounts || 0);
+  document.getElementById('cnt-categories').innerText = data.lobsCount !== undefined ? data.lobsCount : (data.lobs || 0);
+  document.getElementById('cnt-carriers').innerText = data.carriersCount !== undefined ? data.carriersCount : (data.carriers || 0);
+  document.getElementById('cnt-policies').innerText = data.processedRows !== undefined ? data.processedRows : (data.policies || 0);
 }
 
 function handleFileSelect(e) {
@@ -69,6 +86,9 @@ async function uploadSelectedFile() {
         `Accounts Created/Updated: ${result.data.accountsCount}\n` +
         `LOBs Created/Updated: ${result.data.lobsCount}\n` +
         `Carriers Created/Updated: ${result.data.carriersCount}`;
+
+      updateStatCards(result.data);
+      fetchOverviewStats();
     } else {
       logBox.innerText = `[Error] ${result.message || result.error}`;
     }

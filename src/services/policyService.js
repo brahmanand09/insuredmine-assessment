@@ -86,3 +86,16 @@ exports.aggregatePoliciesByUser = async () => {
 
   return await Policy.aggregate(pipeline);
 };
+
+exports.getCollectionOverview = async () => {
+  const [agents, users, accounts, lobs, carriers, policies] = await Promise.all([
+    Agent.countDocuments(),
+    User.countDocuments(),
+    Account.countDocuments(),
+    Lob.countDocuments(),
+    Carrier.countDocuments(),
+    Policy.countDocuments()
+  ]);
+
+  return { agents, users, accounts, lobs, carriers, policies };
+};

@@ -60,3 +60,18 @@ exports.getHealthStatus = (req, res) => {
     cpu: cpuMetrics
   });
 };
+
+/**
+ * GET /api/policies/overview
+ */
+exports.getCollectionOverview = async (req, res, next) => {
+  try {
+    const data = await policyService.getCollectionOverview();
+    return res.status(200).json({
+      success: true,
+      data
+    });
+  } catch (error) {
+    next(error);
+  }
+};

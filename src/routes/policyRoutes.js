@@ -7,4 +7,6 @@ router.get('/search/:username', policyController.searchPolicies);
 router.get('/aggregate/users', policyController.aggregatePoliciesByUsers);
 router.get('/aggregated', policyController.aggregatePoliciesByUsers); // Backwards compatibility alias
 
+router.get('/overview', policyController.getCollectionOverview);
+
 module.exports = router;
