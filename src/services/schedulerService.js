@@ -25,12 +25,21 @@ function calculateTargetDate(dayStr, timeStr) {
   const seconds = match[3] ? parseInt(match[3], 10) : 0;
   const meridian = match[4] ? match[4].toLowerCase() : null;
 
-  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) {
-    throw new Error('Invalid time values. Hours must be 0-23, minutes and seconds must be 0-59');
+  if (meridian) {
+    if (hours < 1 || hours > 12) {
+      throw new Error('Invalid 12-hour format. Hours must be between 1 and 12 when AM/PM is specified');
+    }
+    if (meridian === 'pm' && hours < 12) hours += 12;
+    if (meridian === 'am' && hours === 12) hours = 0;
+  } else {
+    if (hours < 0 || hours > 23) {
+      throw new Error('Invalid 24-hour format. Hours must be between 0 and 23');
+    }
   }
 
-  if (meridian === 'pm' && hours < 12) hours += 12;
-  if (meridian === 'am' && hours === 12) hours = 0;
+  if (minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) {
+    throw new Error('Invalid time values. Minutes and seconds must be between 0 and 59');
+  }
 
   let targetDate = new Date();
   const now = new Date();
@@ -51,7 +60,7 @@ function calculateTargetDate(dayStr, timeStr) {
       targetDate.setDate(targetDate.getDate() + diff);
     } else {
       const parsed = new Date(dayStr);
-      if (isNaN(parsed.getTime())) {
+      if (Number.isNaN(parsed.getTime())) {
         throw new Error('Invalid day/date specified. Expected "today", "tomorrow", a weekday name, or a valid date (YYYY-MM-DD)');
       }
       targetDate = parsed;
@@ -60,7 +69,7 @@ function calculateTargetDate(dayStr, timeStr) {
 
   targetDate.setHours(hours, minutes, seconds, 0);
 
-  if (isNaN(targetDate.getTime())) {
+  if (Number.isNaN(targetDate.getTime())) {
     throw new Error('Invalid day/date specified');
   }
 
