@@ -141,7 +141,7 @@ async function processFile() {
             state: (item.row.state || '').trim(),
             zip: String(item.row.zip || '').trim(),
             gender: item.row.gender ? String(item.row.gender).trim() : null,
-            userType: (item.row.userType || 'Active Client').trim()
+            userType: String(item.row.userType || '').trim()
           }
         },
         upsert: true
@@ -196,7 +196,7 @@ async function processFile() {
             update: {
               $set: {
                 name: item.accountName,
-                type: (item.row.account_type || 'Commercial').trim(),
+                type: String(item.row.account_type || '').trim(),
                 userId
               }
             },
@@ -238,7 +238,7 @@ async function processFile() {
               agentId,
               accountId,
               premiumAmount: parseFloat(item.row.premium_amount) || 0,
-              policyType: String(item.row.policy_type || 'Single').trim(),
+              policyType: String(item.row.policy_type || '').trim(),
               policyMode: String(item.row.policy_mode || '').trim()
             }
           },
