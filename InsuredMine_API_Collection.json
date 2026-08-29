@@ -1,9 +1,16 @@
 {
   "info": {
     "name": "InsuredMine Technical Assessment API",
-    "description": "API collection for InsuredMine assessment featuring Task 1 (Worker thread XLSX upload, Policy search by username, Aggregated policy by user) and Task 2 (CPU monitor & Scheduled message post service).",
+    "description": "Postman API collection for InsuredMine assessment featuring Worker Thread XLSX Ingestion, Policy Search, User Aggregations, CPU Monitoring, and Atomic Message Scheduler.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    }
+  ],
   "item": [
     {
       "name": "Task 1 - Upload XLSX/CSV (Worker Threads)",
@@ -16,16 +23,19 @@
             {
               "key": "file",
               "type": "file",
-              "src": "data-sheet - Node js Assesment (2) (1).xlsx"
+              "src": []
             }
           ]
         },
         "url": {
-          "raw": "http://localhost:3000/api/policies/upload",
-          "protocol": "http",
-          "host": ["localhost"],
-          "port": "3000",
-          "path": ["api", "policies", "upload"]
+          "raw": "{{baseUrl}}/api/import",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "import"
+          ]
         }
       }
     },
@@ -35,82 +45,57 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "http://localhost:3000/api/policies/search?username=Lura Lucca",
-          "protocol": "http",
-          "host": ["localhost"],
-          "port": "3000",
-          "path": ["api", "policies", "search"],
+          "raw": "{{baseUrl}}/api/policies/search?username=Lura",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "policies",
+            "search"
+          ],
           "query": [
             {
               "key": "username",
-              "value": "Lura Lucca"
+              "value": "Lura"
             }
           ]
         }
       }
     },
     {
-      "name": "Task 1 - Aggregated Policy by Each User",
+      "name": "Task 1 - Aggregated Policies by Each User",
       "request": {
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "http://localhost:3000/api/policies/aggregated",
-          "protocol": "http",
-          "host": ["localhost"],
-          "port": "3000",
-          "path": ["api", "policies", "aggregated"]
+          "raw": "{{baseUrl}}/api/policies/aggregate/users",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "policies",
+            "aggregate",
+            "users"
+          ]
         }
       }
     },
     {
-      "name": "Task 1 - Database Collections Overview",
+      "name": "Task 2 - Server Health & CPU Metrics",
       "request": {
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "http://localhost:3000/api/policies/overview",
-          "protocol": "http",
-          "host": ["localhost"],
-          "port": "3000",
-          "path": ["api", "policies", "overview"]
-        }
-      }
-    },
-    {
-      "name": "Task 2 - Real-time CPU Utilization Metrics",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "http://localhost:3000/api/system/cpu",
-          "protocol": "http",
-          "host": ["localhost"],
-          "port": "3000",
-          "path": ["api", "system", "cpu"]
-        }
-      }
-    },
-    {
-      "name": "Task 2 - Simulate CPU Spike >70%",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"durationMs\": 6000\n}"
-        },
-        "url": {
-          "raw": "http://localhost:3000/api/system/simulate-cpu-spike",
-          "protocol": "http",
-          "host": ["localhost"],
-          "port": "3000",
-          "path": ["api", "system", "simulate-cpu-spike"]
+          "raw": "{{baseUrl}}/api/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "health"
+          ]
         }
       }
     },
@@ -126,28 +111,35 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"message\": \"Policy Renewal Reminder for Client\",\n  \"day\": \"tomorrow\",\n  \"time\": \"14:30\"\n}"
+          "raw": "{\n  \"message\": \"Policy Renewal Notification\",\n  \"day\": \"tomorrow\",\n  \"time\": \"14:30\"\n}"
         },
         "url": {
-          "raw": "http://localhost:3000/api/messages/schedule",
-          "protocol": "http",
-          "host": ["localhost"],
-          "port": "3000",
-          "path": ["api", "messages", "schedule"]
+          "raw": "{{baseUrl}}/api/messages/schedule",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "messages",
+            "schedule"
+          ]
         }
       }
     },
     {
-      "name": "Task 2 - Get All Scheduled Messages",
+      "name": "Task 2 - Get Scheduled Messages",
       "request": {
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "http://localhost:3000/api/messages",
-          "protocol": "http",
-          "host": ["localhost"],
-          "port": "3000",
-          "path": ["api", "messages"]
+          "raw": "{{baseUrl}}/api/messages",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "messages"
+          ]
         }
       }
     }
