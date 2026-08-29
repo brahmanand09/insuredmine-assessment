@@ -9,7 +9,7 @@ A Node.js backend application built with Express and MongoDB for importing XLSX/
 - **Worker Threads Data Import (`POST /api/import`)**:
   - Asynchronously parses `.xlsx` and `.csv` files off the main event loop using Node.js `worker_threads`.
   - Uses MongoDB `bulkWrite()` with `upsert: true` for bulk ingestion and entity deduplication.
-  - Implements strict validation: rows missing required business fields (`email`, `policy_number`, `firstname`, `agent`, `account_name`, `category_name`, `company_name`) are safely skipped and reported in the API response `errors` array. No manufactured/fake business data.
+  - Implements strict validation: rows missing required business fields (`email`, `policy_number`, `firstname`, `agent`, `account_name`, `category_name`, `company_name`) are safely skipped and reported in the API response `errors` array. Zero manufactured/fake business data.
   - Automatic cleanup of uploaded temporary files post-ingestion.
 
 - **Policy Search API (`GET /api/policies/search?username=...`)**:
@@ -86,12 +86,10 @@ InsuredMine/
 │   └── app.js
 ├── tests/
 │   └── api.test.js               # Isolated test suite (uses .env.test)
-├── uploads/                      # Temporary file upload folder
+├── uploads/                      # Temporary file upload folder (.gitkeep)
 ├── ecosystem.config.js           # PM2 configuration file
-├── .env                          # Development environment config
-├── .env.test                     # Isolated test environment config
 ├── .env.example                  # Environment configuration template
-├── .gitignore
+├── .gitignore                    # Security-hardened gitignore
 ├── package.json
 └── README.md
 ```

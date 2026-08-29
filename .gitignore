@@ -6,6 +6,11 @@ node_modules/
 .env.*
 !.env.example
 
+# Excel & Data sheets (Protect sensitive sample data)
+*.xlsx
+*.xls
+*.csv
+
 # Logs
 logs/
 *.log
