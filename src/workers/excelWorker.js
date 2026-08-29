@@ -38,7 +38,7 @@ async function processFile() {
     const validRows = [];
     const skippedRows = [];
 
-    // 1. Strict Validation: Validate email and policy_number (No manufacturing fake data)
+    // Strict Validation: Validate all 7 business-critical fields (No manufactured fake data)
     for (let i = 0; i < rawRows.length; i++) {
       const row = rawRows[i];
       const rowNum = i + 2; // Excel line number (row 1 is header)
@@ -55,11 +55,35 @@ async function processFile() {
         continue;
       }
 
-      const firstname = (row.firstname || row.user || 'Unknown User').trim();
-      const agentName = (row.agent || 'Unknown Agent').trim();
-      const accountName = (row.account_name || `${firstname}'s Account`).trim();
-      const categoryName = (row.category_name || 'General').trim();
-      const companyName = (row.company_name || 'Default Carrier').trim();
+      const firstname = String(row.firstname || row.user || '').trim();
+      if (!firstname) {
+        skippedRows.push({ row: rowNum, reason: 'First name is required' });
+        continue;
+      }
+
+      const agentName = String(row.agent || '').trim();
+      if (!agentName) {
+        skippedRows.push({ row: rowNum, reason: 'Agent name is required' });
+        continue;
+      }
+
+      const accountName = String(row.account_name || '').trim();
+      if (!accountName) {
+        skippedRows.push({ row: rowNum, reason: 'Account name is required' });
+        continue;
+      }
+
+      const categoryName = String(row.category_name || '').trim();
+      if (!categoryName) {
+        skippedRows.push({ row: rowNum, reason: 'Category name (LOB) is required' });
+        continue;
+      }
+
+      const companyName = String(row.company_name || '').trim();
+      if (!companyName) {
+        skippedRows.push({ row: rowNum, reason: 'Company name (Carrier) is required' });
+        continue;
+      }
 
       validRows.push({
         row,
@@ -90,7 +114,7 @@ async function processFile() {
       return;
     }
 
-    // 2. Batch-Scoped Queries (Extract unique batch entities)
+    // Batch-Scoped Queries (Extract unique batch entities)
     const uniqueAgentNames = [...new Set(validRows.map(r => r.agentName))];
     const uniqueEmails = [...new Set(validRows.map(r => r.email))];
     const uniqueLobNames = [...new Set(validRows.map(r => r.categoryName))];

@@ -8,13 +8,6 @@ exports.scheduleMessage = async (req, res, next) => {
   try {
     const { message, day, time } = req.body;
 
-    if (!message || !day || !time) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required parameters. Request body must include "message", "day", and "time".'
-      });
-    }
-
     const doc = await schedulerService.scheduleMessage({ message, day, time });
 
     return res.status(201).json({
@@ -23,6 +16,12 @@ exports.scheduleMessage = async (req, res, next) => {
       data: doc
     });
   } catch (error) {
+    if (error.message.includes('required') || error.message.includes('Invalid')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
     next(error);
   }
 };

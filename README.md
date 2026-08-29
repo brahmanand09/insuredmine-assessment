@@ -9,7 +9,7 @@ A Node.js backend application built with Express and MongoDB for importing XLSX/
 - **Worker Threads Data Import (`POST /api/import`)**:
   - Asynchronously parses `.xlsx` and `.csv` files off the main event loop using Node.js `worker_threads`.
   - Uses MongoDB `bulkWrite()` with `upsert: true` for bulk ingestion and entity deduplication.
-  - Implements strict validation: rows missing required `email` or `policy_number` are safely skipped and reported in the API response `errors` array. No manufactured/fake data.
+  - Implements strict validation: rows missing required business fields (`email`, `policy_number`, `firstname`, `agent`, `account_name`, `category_name`, `company_name`) are safely skipped and reported in the API response `errors` array. No manufactured/fake business data.
   - Automatic cleanup of uploaded temporary files post-ingestion.
 
 - **Policy Search API (`GET /api/policies/search?username=...`)**:
@@ -26,7 +26,7 @@ A Node.js backend application built with Express and MongoDB for importing XLSX/
   - `lobs`: Unique `name` index (Policy Categories).
   - `carriers`: Unique `name` index (Policy Carriers).
   - `policies`: Unique `policyNumber` index referencing User, Agent, Account, LOB, and Carrier.
-  - `scheduled_messages`: Persistent task log.
+  - `scheduled_messages`: Persistent scheduled job log.
   - `messages`: Collection for executed scheduled messages.
 
 - **Real-Time CPU Monitoring & PM2 Auto-Restart**:
@@ -36,6 +36,7 @@ A Node.js backend application built with Express and MongoDB for importing XLSX/
 
 - **Atomic Message Scheduler (`POST /api/messages/schedule`)**:
   - Accepts `message`, `day`, and `time` parameters in the body.
+  - Validates date & time strictly (e.g. `HH:MM`, `HH:MM AM/PM`). Returns `400 Bad Request` on invalid time formats.
   - Persists scheduled jobs in MongoDB (`scheduled_messages`).
   - Uses atomic job claiming (`findOneAndUpdate` with `status: 'pending' -> 'processing'`) to prevent duplicate execution across multiple app instances.
 
@@ -44,7 +45,7 @@ A Node.js backend application built with Express and MongoDB for importing XLSX/
 ## 📂 Project Directory Structure
 
 ```
-insurance-policy-api/
+InsuredMine/
 ├── src/
 │   ├── app.js                    # Express app configuration & middleware
 │   ├── server.js                 # Server entry point & DB initialization
@@ -81,8 +82,11 @@ insurance-policy-api/
 │       ├── cpuUsage.js           # CPU utilization helper
 │       └── logger.js             # Logging utility
 ├── public/                       # Glassmorphic Admin Web Dashboard
+│   ├── index.html
+│   └── app.js
 ├── tests/
 │   └── api.test.js               # Isolated test suite (uses .env.test)
+├── uploads/                      # Temporary file upload folder
 ├── ecosystem.config.js           # PM2 configuration file
 ├── .env                          # Development environment config
 ├── .env.test                     # Isolated test environment config
@@ -107,7 +111,7 @@ cd insuredmine-assessment
 npm install
 ```
 
-### 3. Environment Configuration
+### 3. Environment Variables
 Create `.env` file from `.env.example`:
 ```env
 PORT=5000

@@ -55,7 +55,7 @@ async function runTestSuite() {
     console.log(`[Test Server]: Express test instance running on http://127.0.0.1:${PORT}`);
 
     // 1. Test File Upload API (POST /api/import)
-    console.log('\n[1/7 Testing POST /api/import...]');
+    console.log('\n[1/8 Testing POST /api/import...]');
     const sampleFilePath = path.resolve(__dirname, '../data-sheet - Node js Assesment (2) (1).xlsx');
 
     if (!fs.existsSync(sampleFilePath)) {
@@ -81,7 +81,7 @@ async function runTestSuite() {
     console.log('[Import Response]:', importRes);
 
     // 2. Verify MongoDB Collections
-    console.log('\n[2/7 Verifying 6 MongoDB Collections in Test Database...]');
+    console.log('\n[2/8 Verifying 6 MongoDB Collections in Test Database...]');
     const [agentCount, userCount, accountCount, lobCount, carrierCount, policyCount] = await Promise.all([
       Agent.countDocuments(),
       User.countDocuments(),
@@ -103,7 +103,7 @@ async function runTestSuite() {
     }
 
     // 3. Test Policy Search API (Existing User & Unknown User)
-    console.log('\n[3/7 Testing GET /api/policies/search...]');
+    console.log('\n[3/8 Testing GET /api/policies/search...]');
     const sampleUser = await User.findOne();
     const searchRes = await httpRequest(`/api/policies/search?username=${encodeURIComponent(sampleUser.firstName)}`, 'GET');
     console.log(`[Search Response for "${sampleUser.firstName}"]:`, searchRes.success ? `Found ${searchRes.data.policies.length} policies` : searchRes.message);
@@ -112,12 +112,12 @@ async function runTestSuite() {
     console.log('[Search Unknown User Response (404 expected)]:', unknownSearchRes.message);
 
     // 4. Test User Aggregations API
-    console.log('\n[4/7 Testing GET /api/policies/aggregate/users...]');
+    console.log('\n[4/8 Testing GET /api/policies/aggregate/users...]');
     const aggRes = await httpRequest('/api/policies/aggregate/users', 'GET');
     console.log(`[Aggregation Response]: Returned ${aggRes.data ? aggRes.data.length : 0} user aggregated records.`);
 
     // 5. Test Scheduler API & Atomic Job Execution
-    console.log('\n[5/7 Testing POST /api/messages/schedule...]');
+    console.log('\n[5/8 Testing POST /api/messages/schedule...]');
     const schedPayload = JSON.stringify({
       message: 'Isolated test notification',
       day: 'today',
@@ -129,13 +129,26 @@ async function runTestSuite() {
     });
     console.log('[Scheduler API Response]:', schedRes);
 
-    // 6. Test Health Endpoint
-    console.log('\n[6/7 Testing GET /api/health...]');
+    // 6. Test Scheduler Invalid Time Validation (400 Bad Request Expected)
+    console.log('\n[6/8 Testing POST /api/messages/schedule with invalid time string...]');
+    const invalidTimePayload = JSON.stringify({
+      message: 'Hello',
+      day: '2026-09-10',
+      time: 'wrong-time'
+    });
+
+    const invalidTimeRes = await httpRequest('/api/messages/schedule', 'POST', Buffer.from(invalidTimePayload), {
+      'Content-Type': 'application/json'
+    });
+    console.log('[Scheduler Invalid Time Response (400 Expected)]:', invalidTimeRes);
+
+    // 7. Test Health Endpoint
+    console.log('\n[7/8 Testing GET /api/health...]');
     const healthRes = await httpRequest('/api/health', 'GET');
     console.log('[Health Response]: Status:', healthRes.status, '| CPU:', healthRes.cpu.currentCpuPercentage + '%');
 
-    // 7. Verify Temporary File Cleanup in uploads/
-    console.log('\n[7/7 Verifying Upload Temporary File Cleanup...]');
+    // 8. Verify Temporary File Cleanup in uploads/
+    console.log('\n[8/8 Verifying Upload Temporary File Cleanup...]');
     const uploadsDir = path.resolve(__dirname, '../uploads');
     const filesInUploads = fs.readdirSync(uploadsDir).filter(f => f !== '.gitkeep');
     console.log(` -> Files remaining in uploads/: ${filesInUploads.length} (Expected: 0)`);

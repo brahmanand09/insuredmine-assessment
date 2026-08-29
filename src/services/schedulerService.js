@@ -4,11 +4,39 @@ const Message = require('../models/Message');
 const logger = require('../utils/logger');
 
 function calculateTargetDate(dayStr, timeStr) {
+  if (!dayStr || !String(dayStr).trim()) {
+    throw new Error('Day is required');
+  }
+
+  if (!timeStr || !String(timeStr).trim()) {
+    throw new Error('Time is required');
+  }
+
+  // Parse & Validate time string (e.g. "10:30", "14:45:00", "2:30 PM")
+  const timeRegex = /^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?$/i;
+  const match = String(timeStr).trim().match(timeRegex);
+
+  if (!match) {
+    throw new Error('Invalid time format. Expected format HH:MM, HH:MM:SS, or HH:MM AM/PM (e.g. 10:30, 14:45, 2:30 PM)');
+  }
+
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const seconds = match[3] ? parseInt(match[3], 10) : 0;
+  const meridian = match[4] ? match[4].toLowerCase() : null;
+
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) {
+    throw new Error('Invalid time values. Hours must be 0-23, minutes and seconds must be 0-59');
+  }
+
+  if (meridian === 'pm' && hours < 12) hours += 12;
+  if (meridian === 'am' && hours === 12) hours = 0;
+
   let targetDate = new Date();
   const now = new Date();
-  const lowerDay = String(dayStr || '').trim().toLowerCase();
+  const lowerDay = String(dayStr).trim().toLowerCase();
 
-  if (lowerDay === 'today' || !dayStr) {
+  if (lowerDay === 'today') {
     targetDate = new Date(now);
   } else if (lowerDay === 'tomorrow') {
     targetDate = new Date(now);
@@ -23,40 +51,35 @@ function calculateTargetDate(dayStr, timeStr) {
       targetDate.setDate(targetDate.getDate() + diff);
     } else {
       const parsed = new Date(dayStr);
-      if (!isNaN(parsed.getTime())) {
-        targetDate = parsed;
+      if (isNaN(parsed.getTime())) {
+        throw new Error('Invalid day/date specified. Expected "today", "tomorrow", a weekday name, or a valid date (YYYY-MM-DD)');
       }
+      targetDate = parsed;
     }
   }
 
-  // Parse time (e.g. "10:30", "14:45:00", "2:30 PM")
-  const timeRegex = /^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?$/i;
-  const match = String(timeStr || '').trim().match(timeRegex);
+  targetDate.setHours(hours, minutes, seconds, 0);
 
-  if (match) {
-    let hours = parseInt(match[1], 10);
-    const minutes = parseInt(match[2], 10);
-    const seconds = match[3] ? parseInt(match[3], 10) : 0;
-    const meridian = match[4] ? match[4].toLowerCase() : null;
-
-    if (meridian === 'pm' && hours < 12) hours += 12;
-    if (meridian === 'am' && hours === 12) hours = 0;
-
-    targetDate.setHours(hours, minutes, seconds, 0);
+  if (isNaN(targetDate.getTime())) {
+    throw new Error('Invalid day/date specified');
   }
 
   return targetDate;
 }
 
 exports.scheduleMessage = async ({ message, day, time }) => {
+  if (!message || !String(message).trim()) {
+    throw new Error('Message is required');
+  }
+
   const scheduledAt = calculateTargetDate(day, time);
   const now = new Date();
 
   // Persist scheduled job in MongoDB
   const doc = await ScheduledMessage.create({
-    message,
-    day,
-    time,
+    message: String(message).trim(),
+    day: String(day).trim(),
+    time: String(time).trim(),
     scheduledAt,
     status: 'pending'
   });
@@ -86,7 +109,6 @@ async function executeJob(jobId) {
     );
 
     if (!job) {
-      // Job already claimed or completed by another instance
       return;
     }
 
