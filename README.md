@@ -45,7 +45,7 @@ A Node.js backend application built with Express and MongoDB for importing XLSX/
 ## 📂 Project Directory Structure
 
 ```
-InsuredMine/
+insuredmine-assessment/
 ├── src/
 │   ├── app.js                    # Express app configuration & middleware
 │   ├── server.js                 # Server entry point & DB initialization
@@ -91,7 +91,8 @@ InsuredMine/
 ├── .env.example                  # Environment configuration template
 ├── .gitignore                    # Security-hardened gitignore
 ├── package.json
-└── README.md
+├── README.md
+└── server.js
 ```
 
 ---
